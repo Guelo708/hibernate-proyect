@@ -1,0 +1,12 @@
+# Ignorar la carpeta de compilación de Maven 
+target/
+
+# Ignorar arcchivos PDF generados auctomaticamente 
+*.pdf
+
+# Ignorar configuraciones locales del editor de código 
+.vscode/
+.settings/
+.classpath
+.project
+bin/
