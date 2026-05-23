@@ -28,5 +28,27 @@
             <artifactId>postgresql</artifactId>
             <version>42.7.10</version>
         </dependency>
+
+        <!-- OpenPDF: Librería para crear PDFs -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.35</version>
+        </dependency>
+
+        <!-- JavaMail API: Para enviar correos -->
+        <dependency>
+            <groupId>javax.mail</groupId>
+            <artifactId>javax.mail-api</artifactId>
+            <version>1.6.2</version>
+        </dependency>
+
+        <!-- Implementación de JavaMail -->
+        <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>javax.mail</artifactId>
+            <version>1.6.2</version>
+        </dependency>
+
     </dependencies>
 </project>

@@ -13,9 +13,16 @@ import org.example.repository.PropertyTypeRepository;
 import org.example.repository.SectorRepository;
 import org.example.repository.TariffRepository;
 import org.example.repository.UserRepository;
+import org.example.util.EmailConfig;
+import org.example.util.EmailService;
 import org.example.util.JpaUtil;
 
 import jakarta.persistence.EntityManager;
+
+import com.lowagie.text.Document; // Documento PDF
+import com.lowagie.text.FontFactory; // Factory para crear fuentes
+import com.lowagie.text.pdf.PdfWriter; // Escritor de PDF
+import java.io.FileOutputStream; // Salida a archivo
 
 public class Main {
 
@@ -74,8 +81,13 @@ public class Main {
                     menuPropertyTypes();
                 case 4 ->
                     menuProperties();
-                case 5 ->
-                    menuBills();
+                case 5 -> {
+                    try {
+                        menuBills();
+                    } catch (Exception e) {
+                        System.out.println("Error al gestionar facturas: " + e.getMessage());
+                    }
+                }
                 case 6 ->
                     menuBillStatuses();
                 case 7 ->
@@ -122,7 +134,8 @@ public class Main {
                 String celular = scanner.nextLine();
                 System.out.print("Email: ");
                 String email = scanner.nextLine();
-                userRepo.save(new User(cedula, primerNombre, segundoNombre, primerApellido, segundoApellido, celular, email));
+                userRepo.save(
+                        new User(cedula, primerNombre, segundoNombre, primerApellido, segundoApellido, celular, email));
                 System.out.println("Usuario guardado.");
             }
             case 2 ->
@@ -498,6 +511,7 @@ public class Main {
         System.out.println("2. Listar");
         System.out.println("3. Actualizar");
         System.out.println("4. Eliminar");
+
         System.out.print("Opción: ");
         int opt = scanner.nextInt();
         scanner.nextLine();
@@ -537,12 +551,13 @@ public class Main {
         }
     }
 
-    private static void menuBills() {
+    private static void menuBills() throws Exception {
         System.out.println("\n--- GESTIÓN DE FACTURAS ---");
         System.out.println("1. Crear");
         System.out.println("2. Listar");
         System.out.println("3. Actualizar");
-        System.out.println("4. Eliminar");
+        System.out.println("4. Generar PDF");
+        System.out.println("5. Eliminar");
         System.out.print("Opción: ");
         int opt = scanner.nextInt();
         scanner.nextLine();
@@ -609,7 +624,47 @@ public class Main {
                     System.out.println("Factura actualizada.");
                 }, () -> System.out.println("No encontrada."));
             }
+            
             case 4 -> {
+                String pdfPath = "reporte.pdf";
+                var doc = new Document();
+
+                // Crear el escritor que genera el archivo
+                PdfWriter.getInstance(doc, new FileOutputStream(pdfPath));
+
+                // Abrir el documento para agregar contenido
+                doc.open();
+
+                for (Bill bill : billRepo.findAll()) {
+                    doc.add(new com.lowagie.text.Paragraph(bill.toString()));
+                }
+
+                // Agregar título
+                var titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+                doc.add(new com.lowagie.text.Paragraph("Reporte de Sistema", titleFont));
+                doc.add(new com.lowagie.text.Paragraph(" ")); // Espacio vacío
+
+                // Cerrar el documento (genera el archivo)
+                doc.close();
+
+                System.out.println("✓ PDF generado: " + pdfPath);
+                
+                // Menú para enviar por correo
+                System.out.println("\n--- OPCIONES DEL PDF ---");
+                System.out.println("1. Enviar por correo");
+                System.out.println("2. Solo guardar (sin enviar)");
+                System.out.print("Opción: ");
+                int pdfOption = scanner.nextInt();
+                scanner.nextLine();
+                
+                if (pdfOption == 1) {
+                    enviarPdfPorCorreo(pdfPath);
+                } else {
+                    System.out.println("PDF guardado localmente.");
+                }
+            }
+            
+            case 5 -> {
                 System.out.print("ID de la Factura a eliminar: ");
                 Long id = scanner.nextLong();
                 scanner.nextLine();
@@ -619,6 +674,66 @@ public class Main {
                     System.out.println("Factura eliminada.");
                 }, () -> System.out.println("No encontrada."));
             }
+        }
+    }
+
+    /**
+     * Método auxiliar para enviar PDF por correo
+     */
+    private static void enviarPdfPorCorreo(String pdfPath) {
+        // Verificar si está configurado
+        if (!EmailConfig.isConfigured()) {
+            System.out.println("\nERROR: Debes configurar los datos del correo primero.");
+            System.out.println("PASOS:");
+            System.out.println("1. Abre: src/main/java/org/example/util/EmailConfig.java");
+            System.out.println("2. Reemplaza los valores de:");
+            System.out.println("   - SENDER_EMAIL: tu correo de Gmail");
+            System.out.println("   - SENDER_PASSWORD: contraseña de aplicación");
+            System.out.println("3. Guarda el archivo y vuelve a intentar");
+            System.out.println("\nGuía: https://myaccount.google.com/apppasswords");
+            return;
+        }
+
+        System.out.print("\nEmail del destinatario: ");
+        String recipientEmail = scanner.nextLine();
+        
+        if (!recipientEmail.contains("@")) {
+            System.out.println("Email inválido.");
+            return;
+        }
+
+        System.out.print("Asunto del correo [Reporte de Facturas]: ");
+        String subject = scanner.nextLine();
+        if (subject.isEmpty()) {
+            subject = "Reporte de Facturas";
+        }
+
+        System.out.print("Mensaje (opcional): ");
+        String body = scanner.nextLine();
+        if (body.isEmpty()) {
+            body = "Adjunto encontrará el reporte del sistema de facturas.";
+        }
+
+        System.out.println("\n Enviando correo...");
+        
+        // Inicializar servicio de correo
+        EmailService emailService = new EmailService(
+            EmailConfig.SENDER_EMAIL,
+            EmailConfig.SENDER_PASSWORD,
+            EmailConfig.SMTP_SERVER,
+            EmailConfig.SMTP_PORT
+        );
+
+        // Enviar correo
+        boolean enviado = emailService.sendEmailWithAttachment(recipientEmail, subject, body, pdfPath);
+        
+        if (enviado) {
+            System.out.println("Correo enviado exitosamente a: " + recipientEmail);
+        } else {
+            System.out.println("Error al enviar el correo. Verifica:");
+            System.out.println("   - La configuración en EmailConfig.java");
+            System.out.println("   - Tu conexión a internet");
+            System.out.println("   - El email del destinatario");
         }
     }
 
